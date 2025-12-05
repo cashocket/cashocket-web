@@ -1,0 +1,317 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import api from "@/lib/api";
+import { toast } from "sonner";
+import { Loader2, CalendarIcon, Clock } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { useCurrency } from "@/context/currency-context";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+interface EditTransactionProps {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  transaction: any;
+  onSuccess: () => void;
+}
+
+export function EditTransactionDialog({
+  open,
+  setOpen,
+  transaction,
+  onSuccess,
+}: EditTransactionProps) {
+  const { symbol } = useCurrency();
+  const [loading, setLoading] = useState(false);
+
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [time, setTime] = useState<string>("");
+  const [type, setType] = useState<"income" | "expense">("expense");
+
+  const timeSlots = Array.from({ length: 48 }).map((_, i) => {
+    const hour = Math.floor(i / 2)
+      .toString()
+      .padStart(2, "0");
+    const minute = i % 2 === 0 ? "00" : "30";
+    return `${hour}:${minute}`;
+  });
+
+  useEffect(() => {
+    if (transaction && open) {
+      const txnDate = new Date(transaction.date);
+      setDate(txnDate);
+
+      // Logic to snap time to nearest 30 mins to match Dropdown options
+      const minutes = txnDate.getMinutes();
+      const roundedMinutes = minutes < 15 ? "00" : minutes < 45 ? "30" : "00"; // Simple rounding logic
+      // Ideally backend returns specific time, but for UI dropdown we match slots
+      // Better: just take the exact hour and closest slot
+      let displayTime = format(txnDate, "HH:mm");
+
+      // Check if exact time exists in slots, if not, find closest
+      if (!timeSlots.includes(displayTime)) {
+        const h = txnDate.getHours().toString().padStart(2, "0");
+        const m = minutes < 30 ? "00" : "30";
+        displayTime = `${h}:${m}`;
+      }
+      setTime(displayTime);
+
+      setType(transaction.type);
+
+      const fetchDeps = async () => {
+        try {
+          const [accRes, catRes] = await Promise.all([
+            api.get("/accounts"),
+            api.get(`/categories?type=${transaction.type}`),
+          ]);
+          setAccounts(accRes.data);
+          setCategories(catRes.data);
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      fetchDeps();
+    }
+  }, [open, transaction]);
+
+  const handleTypeChange = async (newType: "income" | "expense") => {
+    setType(newType);
+    try {
+      const res = await api.get(`/categories?type=${newType}`);
+      setCategories(res.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (!date || !time) {
+      toast.error("Date & Time required");
+      setLoading(false);
+      return;
+    }
+
+    const dateTimeString = `${format(date, "yyyy-MM-dd")}T${time}:00`;
+    const dateTime = new Date(dateTimeString);
+
+    if (dateTime > new Date()) {
+      toast.error("Future date/time not allowed.");
+      setLoading(false);
+      return;
+    }
+
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      amount: formData.get("amount"),
+      description: formData.get("description"),
+      accountId: formData.get("accountId"),
+      categoryId: formData.get("categoryId"),
+      type,
+      date: dateTime.toISOString(),
+    };
+
+    try {
+      await api.put(`/transactions/${transaction.id}`, data);
+      toast.success("Transaction updated!");
+      setOpen(false);
+      if (onSuccess) onSuccess();
+    } catch (error: any) {
+      toast.error("Failed to update");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-[500px] p-6">
+        <DialogHeader>
+          <DialogTitle>Edit Transaction</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={onSubmit} className="space-y-6 pt-2">
+          {/* Toggle */}
+          <div className="grid grid-cols-2 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+            <button
+              type="button"
+              onClick={() => handleTypeChange("income")}
+              className={cn(
+                "py-1.5 text-sm font-medium rounded-md transition-all",
+                type === "income"
+                  ? "bg-white shadow-sm text-green-700"
+                  : "text-muted-foreground"
+              )}
+            >
+              Income
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTypeChange("expense")}
+              className={cn(
+                "py-1.5 text-sm font-medium rounded-md transition-all",
+                type === "expense"
+                  ? "bg-white shadow-sm text-red-700"
+                  : "text-muted-foreground"
+              )}
+            >
+              Expense
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Amount
+            </Label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-medium text-muted-foreground/70">
+                {symbol}
+              </span>
+              <Input
+                name="amount"
+                type="number"
+                defaultValue={transaction?.amount}
+                step="0.01"
+                required
+                className="pl-14 h-14 text-2xl font-bold bg-zinc-50/50 border-zinc-200"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Category</Label>
+              <Select
+                name="categoryId"
+                defaultValue={transaction?.categoryId}
+                required
+              >
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Account</Label>
+              <Select
+                name="accountId"
+                defaultValue={transaction?.accountId}
+                required
+              >
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* DATE & TIME FIX */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2 flex flex-col">
+              <Label className="text-xs font-medium">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full h-10 pl-3 text-left font-normal",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    disabled={(date) => date > new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Time</Label>
+              <Select value={time} onValueChange={setTime}>
+                <SelectTrigger className="h-10 w-full">
+                  <div className="flex items-center">
+                    <Clock className="mr-2 h-4 w-4 opacity-50" />
+                    <SelectValue placeholder="Time" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="h-[200px]">
+                  {timeSlots.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">Description</Label>
+            <Textarea
+              name="description"
+              defaultValue={transaction?.description}
+              placeholder="Add a note..."
+              className="resize-none h-20"
+            />
+          </div>
+
+          <Button type="submit" disabled={loading} className="w-full h-11">
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save
+            Changes
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
