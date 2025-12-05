@@ -1,5 +1,5 @@
 import express from "express";
-import type { Application, Request, Response } from "express"; // Note: 'type' keyword add kiya hai
+import type { Application, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -13,24 +13,20 @@ import budgetRoutes from "./routes/budgetRoutes.js";
 const app: Application = express();
 
 // --- Middlewares ---
-// Security headers
 app.use(helmet());
 
-// Cross-Origin Resource Sharing (Frontend ko allow karne ke liye)
 app.use(cors({
-  origin: "http://localhost:3000", // Next.js client URL
+  origin: "http://localhost:3000",
   credentials: true,
 }));
 
-// Logger (Requests ko console mein dekhne ke liye)
 app.use(morgan("dev"));
 
-// Body parsers (JSON data padhne ke liye)
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// --- FIX: Increased Body Limit to 10MB ---
+app.use(express.json({ limit: "10mb" })); 
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // --- Routes ---
-// Health Check Route
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({ status: "success", message: "Cashocket Server is Running! 🚀" });
 });
