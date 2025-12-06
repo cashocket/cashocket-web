@@ -18,8 +18,9 @@ app.use(helmet());
 // --- FIX: CORS Configuration for Production & Localhost ---
 // Future Proofing: Allowed origins ki list banayi hai.
 const allowedOrigins = [
-  "http://localhost:3000",                  // Local Development
-  "https://cashocket-web.onrender.com"      // Production Frontend URL
+  "http://localhost:3000",
+  "https://cashocket-web.onrender.com", 
+  "https://cashocket.vercel.app"
 ];
 
 app.use(cors({
