@@ -3,7 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { CurrencyProvider } from "@/context/currency-context";
-import { ThemeProvider } from "@/components/theme-provider"; // Import
+import { ThemeProvider } from "@/components/theme-provider";
+import { GoogleProvider } from "./google-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,7 +29,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <CurrencyProvider>
-            {children}
+            <GoogleProvider>{children}</GoogleProvider>
             <Toaster position="top-center" richColors />
           </CurrencyProvider>
         </ThemeProvider>

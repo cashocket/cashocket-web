@@ -13,20 +13,46 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Settings } from "lucide-react";
+import {
+  LogOut,
+  User as UserIcon,
+  Settings,
+  CreditCard,
+  Sparkles,
+} from "lucide-react";
 
 export function UserNav() {
   const router = useRouter();
-  const [user, setUser] = useState<{ name: string; email: string } | null>(
-    null
-  );
+  const [user, setUser] = useState<{
+    name: string;
+    email: string;
+    avatar?: string;
+  } | null>(null);
 
-  useEffect(() => {
-    // LocalStorage se user data fetch karein
+  // Function to load user data
+  const loadUser = () => {
     const userData = localStorage.getItem("user");
     if (userData) {
-      setUser(JSON.parse(userData));
+      try {
+        setUser(JSON.parse(userData));
+      } catch (e) {
+        console.error("Failed to parse user data");
+      }
     }
+  };
+
+  useEffect(() => {
+    loadUser();
+
+    // Listen for storage events (jab settings se update ho)
+    const handleStorageChange = () => loadUser();
+
+    // Custom event listener for same-tab updates
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -35,54 +61,100 @@ export function UserNav() {
     router.push("/login");
   };
 
-  // Name initials generate karne ke liye (e.g. "John Doe" -> "JD")
   const getInitials = (name: string) => {
-    return name
-      ?.split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .substring(0, 2);
+    return (
+      name
+        ?.split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .substring(0, 2) || "U"
+    );
   };
+
+  // Helper to render avatar properly
+  const renderAvatar = (className: string) => (
+    <Avatar className={className}>
+      {/* Agar avatar base64 string hai ya URL */}
+      <AvatarImage
+        src={user?.avatar && user.avatar.length > 10 ? user.avatar : ""}
+        alt={user?.name}
+        className="object-cover"
+      />
+      <AvatarFallback className="font-bold bg-primary/10 text-primary">
+        {user ? getInitials(user.name) : "U"}
+      </AvatarFallback>
+    </Avatar>
+  );
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-          <Avatar className="h-10 w-10 border border-border">
-            <AvatarImage src="/avatars/01.png" alt={user?.name} />
-            <AvatarFallback className="font-bold bg-primary/10 text-primary">
-              {user ? getInitials(user.name) : "U"}
-            </AvatarFallback>
-          </Avatar>
+        <Button
+          variant="ghost"
+          className="relative h-10 w-10 rounded-full focus-visible:ring-0 focus-visible:ring-offset-0"
+        >
+          {renderAvatar(
+            "h-9 w-9 border-2 border-muted transition-all hover:border-primary/50"
+          )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user?.name}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user?.email}
+
+      <DropdownMenuContent className="w-64 p-2" align="end" forceMount>
+        {/* Header Section with Profile Info */}
+        <div className="flex items-center gap-3 p-2">
+          {renderAvatar("h-10 w-10 border border-border")}
+          <div className="flex flex-col space-y-0.5">
+            <p className="text-sm font-semibold leading-none truncate max-w-[150px]">
+              {user?.name || "User"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+              {user?.email || "user@example.com"}
             </p>
           </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+        </div>
+
+        <DropdownMenuSeparator className="my-2" />
+
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-            <User className="mr-2 h-4 w-4" />
-            <span>Profile</span>
+          <DropdownMenuItem
+            className="cursor-pointer gap-2 py-2.5"
+            onClick={() => router.push("/dashboard/settings")}
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <UserIcon className="h-4 w-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">Profile</span>
+              <span className="text-[10px] text-muted-foreground">
+                Manage your account
+              </span>
+            </div>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
+
+          <DropdownMenuItem
+            className="cursor-pointer gap-2 py-2.5"
+            onClick={() => router.push("/dashboard/settings")}
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-foreground">
+              <Settings className="h-4 w-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">Preferences</span>
+              <span className="text-[10px] text-muted-foreground">
+                Theme & currency
+              </span>
+            </div>
           </DropdownMenuItem>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
+
+        <DropdownMenuSeparator className="my-2" />
+
         <DropdownMenuItem
           onClick={handleLogout}
-          className="text-destructive focus:text-destructive"
+          className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10 gap-2 py-2"
         >
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut className="h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

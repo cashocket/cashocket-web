@@ -18,11 +18,14 @@ import {
   TrendingDown,
   CalendarDays,
   Plus,
+  PieChart, // FIX: Added missing import
 } from "lucide-react";
 import { AddTransactionDialog } from "@/components/add-transaction-dialog";
 import { Separator } from "@/components/ui/separator";
+import { useCurrency } from "@/context/currency-context";
 
 export default function DashboardPage() {
+  const { symbol } = useCurrency(); // Use currency from context
   const [summary, setSummary] = useState({
     totalBalance: 0,
     totalIncome: 0,
@@ -78,12 +81,13 @@ export default function DashboardPage() {
               Total Balance
             </CardTitle>
             <span className="text-muted-foreground font-serif italic text-lg">
-              ₹
+              {symbol}
             </span>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-black tracking-tighter">
-              ₹{summary.totalBalance.toLocaleString()}
+              {symbol}
+              {summary.totalBalance.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               +20.1% from last month
@@ -102,7 +106,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              +₹{summary.totalIncome.toLocaleString()}
+              +{symbol}
+              {summary.totalIncome.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Recorded this month
@@ -121,7 +126,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">
-              -₹{summary.totalExpense.toLocaleString()}
+              -{symbol}
+              {summary.totalExpense.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Spending this month
@@ -130,7 +136,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Main Content Split: Chart (Placeholder) & Recent Transactions */}
+      {/* Main Content Split */}
       <div className="grid gap-4 md:grid-cols-7 lg:grid-cols-7">
         {/* Placeholder for future Chart */}
         <Card className="col-span-4 shadow-none border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/20">
@@ -199,7 +205,9 @@ export default function DashboardPage() {
                         : "text-foreground"
                     }`}
                   >
-                    {txn.type === "income" ? "+" : "-"}₹{txn.amount}
+                    {txn.type === "income" ? "+" : "-"}
+                    {symbol}
+                    {txn.amount}
                   </div>
                 </div>
               ))}

@@ -1,3 +1,5 @@
+// cashocket > client > components > theme-provider.tsx
+
 "use client";
 
 import * as React from "react";

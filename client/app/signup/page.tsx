@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // Navigation ke liye
-import api from "@/lib/api"; // Humara API helper
-import { toast } from "sonner"; // Notification ke liye
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
+import { toast } from "sonner";
+import { useGoogleLogin } from "@react-oauth/google"; // Google Auth Import
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,31 +30,53 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // --- GOOGLE LOGIN HOOK ---
+  const googleSignup = useGoogleLogin({
+    onSuccess: async (codeResponse) => {
+      setIsLoading(true);
+      try {
+        const res = await api.post("/auth/google", {
+          code: codeResponse.code,
+        });
+
+        toast.success(res.data.message || "Account created successfully! 🎉");
+
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data));
+
+        router.push("/dashboard");
+      } catch (error: any) {
+        console.error("Google Signup Failed", error);
+        toast.error("Google Signup Failed. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    flow: "auth-code",
+    onError: () => toast.error("Google Signup Failed"),
+  });
+
+  // --- EMAIL/PASSWORD SIGNUP ---
   async function onSubmit(event: React.SyntheticEvent) {
     event.preventDefault();
     setIsLoading(true);
 
     try {
-      // 1. Backend ko data bhejo
       const response = await api.post("/auth/signup", {
         name,
         email,
         password,
       });
 
-      // 2. Success message dikhao
       toast.success("Account created successfully! 🎉");
 
-      // 3. Token store karo (Future use ke liye local storage main)
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("user", JSON.stringify(response.data));
 
-      // 4. Dashboard par bhejo
       setTimeout(() => {
         router.push("/dashboard");
       }, 1000);
     } catch (error: any) {
-      // Error handling
       console.error(error);
       const errorMessage =
         error.response?.data?.message ||
@@ -94,7 +117,7 @@ export default function SignupPage() {
               Create an account
             </CardTitle>
             <CardDescription>
-              Enter your email below to start your 3-month free trial.
+              Enter your email below to start your free trial.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -103,6 +126,8 @@ export default function SignupPage() {
               variant="outline"
               className="w-full rounded-full gap-2 h-11"
               type="button"
+              onClick={() => googleSignup()}
+              disabled={isLoading}
             >
               <svg
                 className="h-4 w-4"

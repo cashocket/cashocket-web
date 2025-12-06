@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // Router import
-import api from "@/lib/api"; // API Helper
-import { toast } from "sonner"; // Toast notifications
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
+import { toast } from "sonner";
+import { useGoogleLogin } from "@react-oauth/google"; // Google Auth Import
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,35 +25,57 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
-  // States for Email & Password
+  // Form States
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // --- GOOGLE LOGIN HOOK ---
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (codeResponse) => {
+      setIsLoading(true);
+      try {
+        const res = await api.post("/auth/google", {
+          code: codeResponse.code,
+        });
+
+        toast.success(res.data.message || "Logged in successfully! 🎉");
+
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data));
+
+        router.push("/dashboard");
+      } catch (error: any) {
+        console.error("Google Login Failed", error);
+        toast.error("Google Login Failed. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    flow: "auth-code",
+    onError: () => toast.error("Google Login Failed"),
+  });
+
+  // --- EMAIL/PASSWORD LOGIN ---
   async function onSubmit(event: React.SyntheticEvent) {
     event.preventDefault();
     setIsLoading(true);
 
     try {
-      // 1. Backend API Call
       const response = await api.post("/auth/login", {
         email,
         password,
       });
 
-      // 2. Save Token & User Info
+      toast.success("Welcome back! 👋");
+
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("user", JSON.stringify(response.data));
 
-      toast.success("Welcome back! 👋");
-
-      // 3. Redirect to Dashboard
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 500);
+      router.push("/dashboard");
     } catch (error: any) {
       console.error(error);
       const errorMessage =
-        error.response?.data?.message || "Invalid email or password.";
+        error.response?.data?.message || "Invalid credentials.";
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -77,7 +101,7 @@ export default function LoginPage() {
             <span>Cashocket</span>
           </div>
           <p className="text-xs font-medium text-muted-foreground tracking-wider uppercase">
-            by <span className="text-primary">Oxzeen</span>
+            Expense Tracker
           </p>
         </div>
 
@@ -86,15 +110,17 @@ export default function LoginPage() {
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
             <CardDescription>
-              Enter your email to sign in to your account.
+              Enter your credentials to access your account.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            {/* Google Button (Placeholder) */}
+            {/* Google Button */}
             <Button
               variant="outline"
               className="w-full rounded-full gap-2 h-11"
               type="button"
+              onClick={() => googleLogin()}
+              disabled={isLoading}
             >
               <svg
                 className="h-4 w-4"
@@ -111,7 +137,7 @@ export default function LoginPage() {
                   d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
                 ></path>
               </svg>
-              Sign in with Google
+              Continue with Google
             </Button>
 
             <div className="relative">
@@ -120,7 +146,7 @@ export default function LoginPage() {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with
+                  Or continue with email
                 </span>
               </div>
             </div>
@@ -146,12 +172,11 @@ export default function LoginPage() {
                   <Label htmlFor="password">Password</Label>
                   <Link
                     href="/forgot-password"
-                    className="text-xs text-primary hover:underline"
+                    className="text-xs text-primary underline-offset-4 hover:underline"
                   >
                     Forgot password?
                   </Link>
                 </div>
-
                 <div className="relative">
                   <Input
                     id="password"
@@ -189,8 +214,8 @@ export default function LoginPage() {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center">
-            <div className="text-sm text-muted-foreground">
+          <CardFooter className="flex justify-center text-sm text-muted-foreground">
+            <div>
               Don&apos;t have an account?{" "}
               <Link
                 href="/signup"
