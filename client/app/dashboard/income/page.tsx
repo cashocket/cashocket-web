@@ -26,8 +26,7 @@ import { CategoryIconView } from "@/components/category-icon-view";
 // UI Imports
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Search, Trash2, Pencil, TrendingUp, CalendarDays } from "lucide-react";
+import { Search, Trash2, Pencil, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -40,6 +39,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function IncomePage() {
   const { symbol } = useCurrency();
@@ -145,7 +152,7 @@ export default function IncomePage() {
         />
 
         {/* Total Summary Badge */}
-        <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-2 rounded-lg border border-emerald-100 dark:border-emerald-900">
+        <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-2 rounded-lg border border-emerald-100 dark:border-emerald-900 w-full sm:w-auto mt-2 sm:mt-0">
           <div className="bg-emerald-500 rounded-full p-1.5 text-white shadow-sm">
             <TrendingUp className="h-4 w-4" />
           </div>
@@ -163,11 +170,11 @@ export default function IncomePage() {
 
       {/* 3. Charts Section (Grid Layout) */}
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Main Trend Chart (Takes 2 columns) */}
+        {/* Main Trend Chart */}
         <div className="md:col-span-2">
           <IncomeTrendChart data={filteredIncomes} />
         </div>
-        {/* Category Donut Chart (Takes 1 column) */}
+        {/* Category Donut Chart */}
         <div className="md:col-span-1">
           <IncomeCategoryChart data={filteredIncomes} />
         </div>
@@ -175,12 +182,12 @@ export default function IncomePage() {
 
       {/* 4. Transactions List Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        {/* Header & Search Bar - Mobile Responsive Stack */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <h3 className="text-lg font-semibold tracking-tight">
             Recent Transactions
           </h3>
-          {/* Search Bar */}
-          <div className="relative w-full max-w-xs">
+          <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search records..."
@@ -191,104 +198,121 @@ export default function IncomePage() {
           </div>
         </div>
 
-        <div className="grid gap-3">
-          {filteredIncomes.map((inc) => (
-            <Card
-              key={inc.id}
-              className="group hover:shadow-md transition-all border-zinc-200 dark:border-zinc-800 shadow-sm"
-            >
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <CategoryIconView
-                    icon={inc.categoryIcon}
-                    color={inc.categoryColor}
-                  />
-                  <div>
-                    <p className="font-semibold text-foreground text-sm">
-                      {inc.categoryName || "Uncategorized"}
-                    </p>
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      {inc.description || "No description"}
-                    </p>
-                    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground/70">
-                      <CalendarDays className="h-3 w-3" />
-                      <span>{format(new Date(inc.date), "PPP • p")}</span>
-                    </div>
-                  </div>
-                </div>
+        {/* --- SHADCN TABLE START --- */}
+        <div className="rounded-md border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[100px]">Date</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead className="hidden sm:table-cell">Account</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right w-[100px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredIncomes.length > 0 ? (
+                filteredIncomes.map((inc) => (
+                  <TableRow key={inc.id}>
+                    <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">
+                      {format(new Date(inc.date), "MMM dd, yyyy")}
+                      <div className="text-[10px] text-muted-foreground sm:hidden">
+                        {format(new Date(inc.date), "p")}
+                      </div>
+                    </TableCell>
 
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <span className="text-base font-bold text-emerald-600">
-                      +
-                      <span className="text-muted-foreground font-normal text-xs mx-0.5">
-                        {symbol}
-                      </span>
-                      {inc.amount}
-                    </span>
-                    <p className="text-[10px] text-muted-foreground">
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <CategoryIconView
+                          icon={inc.categoryIcon}
+                          color={inc.categoryColor}
+                          className="h-8 w-8 text-xs" // Smaller icon in table
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">
+                            {inc.categoryName}
+                          </span>
+                          {/* Mobile pe Account yahan dikhayenge */}
+                          <span className="text-[10px] text-muted-foreground sm:hidden">
+                            {inc.accountName}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                       {inc.accountName}
-                    </p>
-                  </div>
+                    </TableCell>
 
-                  {/* UX FIX: Opacity Logic Updated */}
-                  <div className="flex gap-1 opacity-100 sm:opacity-60 sm:hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                      onClick={() => {
-                        setSelectedTxn(inc);
-                        setEditOpen(true);
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
+                    <TableCell className="text-right font-bold text-emerald-600">
+                      +{symbol}
+                      {inc.amount}
+                    </TableCell>
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          className="h-8 w-8 hover:text-primary"
+                          onClick={() => {
+                            setSelectedTxn(inc);
+                            setEditOpen(true);
+                          }}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Income?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will remove the transaction and deduct {symbol}
-                            {inc.amount} from {inc.accountName}.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(inc.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
 
-          {filteredIncomes.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800">
-              <div className="bg-muted/50 rounded-full h-12 w-12 flex items-center justify-center mx-auto mb-3">
-                <TrendingUp className="h-6 w-6 opacity-50" />
-              </div>
-              <p>No income records for this period.</p>
-            </div>
-          )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Delete Income?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will remove the transaction and deduct{" "}
+                                {symbol}
+                                {inc.amount} from {inc.accountName}.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(inc.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    No income records found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
+        {/* --- SHADCN TABLE END --- */}
       </div>
 
       <EditTransactionDialog

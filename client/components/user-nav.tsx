@@ -13,13 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  LogOut,
-  User as UserIcon,
-  Settings,
-  CreditCard,
-  Sparkles,
-} from "lucide-react";
+import { LogOut, User as UserIcon, Settings } from "lucide-react";
 
 export function UserNav() {
   const router = useRouter();
@@ -29,7 +23,6 @@ export function UserNav() {
     avatar?: string;
   } | null>(null);
 
-  // Function to load user data
   const loadUser = () => {
     const userData = localStorage.getItem("user");
     if (userData) {
@@ -42,16 +35,19 @@ export function UserNav() {
   };
 
   useEffect(() => {
-    loadUser();
+    loadUser(); // Initial load
 
-    // Listen for storage events (jab settings se update ho)
-    const handleStorageChange = () => loadUser();
+    // --- FIX: Custom Event Listener ---
+    const handleUserUpdate = () => loadUser();
 
-    // Custom event listener for same-tab updates
-    window.addEventListener("storage", handleStorageChange);
+    // Custom event "userDataUpdated" ko suno
+    window.addEventListener("userDataUpdated", handleUserUpdate);
+    // Storage event bhi rakhte hain taaki multi-tab sync rahe
+    window.addEventListener("storage", handleUserUpdate);
 
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("userDataUpdated", handleUserUpdate);
+      window.removeEventListener("storage", handleUserUpdate);
     };
   }, []);
 
@@ -72,10 +68,8 @@ export function UserNav() {
     );
   };
 
-  // Helper to render avatar properly
   const renderAvatar = (className: string) => (
     <Avatar className={className}>
-      {/* Agar avatar base64 string hai ya URL */}
       <AvatarImage
         src={user?.avatar && user.avatar.length > 10 ? user.avatar : ""}
         alt={user?.name}
@@ -101,7 +95,6 @@ export function UserNav() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-64 p-2" align="end" forceMount>
-        {/* Header Section with Profile Info */}
         <div className="flex items-center gap-3 p-2">
           {renderAvatar("h-10 w-10 border border-border")}
           <div className="flex flex-col space-y-0.5">

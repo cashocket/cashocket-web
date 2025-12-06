@@ -93,36 +93,47 @@ export default function DashboardPage() {
     .filter((t) => t.type === "expense")
     .reduce((acc, curr) => acc + parseFloat(curr.amount), 0);
 
-  // Note: Total Balance should ideally be global, but here we show "Cash Flow" for the period
+  // Cash Flow calculation
   const cashFlow = totalIncome - totalExpense;
 
   return (
     <div className="space-y-6">
-      {/* Top Header: Title & Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">
-            Financial overview for the selected period.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* --- Top Header: Title --- */}
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <p className="text-muted-foreground">
+          Financial overview for the selected period.
+        </p>
+      </div>
+
+      {/* --- Controls Toolbar (Filters & Actions) --- */}
+      {/* Mobile: Column layout (Stack), Desktop: Row layout (Side by side) */}
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-4">
+        {/* Filters */}
+        <DashboardFilters
+          filter={filter}
+          setFilter={setFilter}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+        />
+
+        {/* Action Buttons Group */}
+        {/* Mobile: Grid (2 cols for buttons, Transfer full width) */}
+        {/* Desktop: Flex row (All in one line) */}
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <AddTransactionDialog onSuccess={fetchData} defaultType="income" />
           <AddTransactionDialog onSuccess={fetchData} defaultType="expense" />
-          <AddTransferDialog onSuccess={fetchData} />
+
+          {/* Transfer Button wrapper for responsiveness */}
+          <div className="col-span-2 sm:col-span-1">
+            <AddTransferDialog onSuccess={fetchData} />
+          </div>
         </div>
       </div>
 
-      {/* Global Filter Bar */}
-      <DashboardFilters
-        filter={filter}
-        setFilter={setFilter}
-        dateRange={dateRange}
-        setDateRange={setDateRange}
-      />
-
-      {/* Stats Cards (Controlled by Filters) */}
+      {/* --- Stats Cards --- */}
       <div className="grid gap-4 md:grid-cols-3">
+        {/* Cash Flow Card */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -146,6 +157,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
+        {/* Income Card */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -161,6 +173,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
+        {/* Expense Card */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -177,14 +190,15 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid gap-4 md:grid-cols-7">
+      {/* --- Charts Section --- */}
+      {/* Mobile: Stacked, Desktop: Side-by-side */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-7">
         <OverviewChart data={filteredTransactions} />
         <CategoryPie transactions={filteredTransactions} />
       </div>
 
-      {/* Recent Transactions Table */}
-      <div className="grid gap-4 md:grid-cols-1">
+      {/* --- Recent Transactions Table --- */}
+      <div className="grid gap-4 grid-cols-1">
         <RecentTransactions transactions={filteredTransactions} />
       </div>
     </div>

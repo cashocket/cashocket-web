@@ -63,6 +63,8 @@ export function ProfileForm({ user, onUpdate }: ProfileFormProps) {
         JSON.stringify({ ...savedUser, name, avatar })
       );
 
+      window.dispatchEvent(new Event("userDataUpdated"));
+
       toast.success("Profile updated successfully");
       onUpdate();
     } catch (error) {

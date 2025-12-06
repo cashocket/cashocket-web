@@ -1,38 +1,50 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { Loader2 } from "lucide-react";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [isMounted, setIsMounted] = useState(false);
+  const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    // 1. Token check karo
+    const token = localStorage.getItem("token");
 
-  if (!isMounted) return null;
+    if (!token) {
+      // Agar token nahi hai, Login par bhej do
+      router.replace("/login");
+    } else {
+      // Agar token hai, Dashboard dikhao
+      setIsAuthorized(true);
+    }
+  }, [router]);
+
+  // Loading state taaki protected content flash na ho
+  if (!isAuthorized) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-zinc-50/80 dark:bg-zinc-950">
-      {/* SIDEBAR AREA */}
-      {/* Change: 'border-r' aur border colors hata diye hain */}
       <aside className="hidden w-64 flex-col md:flex bg-zinc-50/50 dark:bg-zinc-950">
         <AppSidebar />
       </aside>
 
-      {/* MAIN CONTENT AREA (The Floating Island) */}
       <div className="flex flex-1 flex-col overflow-hidden p-2 md:p-3">
-        {/* Is container ka border aur shadow hi separation create karega */}
         <div className="flex flex-col h-full w-full overflow-hidden rounded-2xl border border-zinc-200 bg-background shadow-sm dark:border-zinc-800">
-          {/* Header sits inside the rounded container */}
           <DashboardHeader />
-
-          {/* Scrollable Page Content */}
           <main className="flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-6xl p-6 md:p-8">
               {children}

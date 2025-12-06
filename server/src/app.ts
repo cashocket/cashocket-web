@@ -15,14 +15,28 @@ const app: Application = express();
 // --- Middlewares ---
 app.use(helmet());
 
+// --- FIX: CORS Configuration for Production & Localhost ---
+// Future Proofing: Allowed origins ki list banayi hai.
+const allowedOrigins = [
+  "http://localhost:3000",                  // Local Development
+  "https://cashocket-web.onrender.com"      // Production Frontend URL
+];
+
 app.use(cors({
-  origin: "http://localhost:3000",
-  credentials: true,
+  origin: (origin, callback) => {
+    // Agar request bina origin ke hai (e.g. Postman/Mobile App) ya allowed list mein hai
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true, // Cookies/Headers allow karne ke liye zaroori hai
 }));
 
 app.use(morgan("dev"));
 
-// --- FIX: Increased Body Limit to 10MB ---
+// --- Body Parsers (10MB limit for Images) ---
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 

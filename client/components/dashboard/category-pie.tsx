@@ -46,12 +46,14 @@ export function CategoryPie({ transactions }: CategoryPieProps) {
     .slice(0, 5); // Top 5 categories only
 
   return (
-    <Card className="col-span-3 shadow-sm">
-      <CardHeader>
-        <CardTitle>Top Expenses by Category</CardTitle>
+    <Card className="col-span-4 lg:col-span-3 shadow-sm border-zinc-200 dark:border-zinc-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base md:text-lg">Top Expenses</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-[300px] w-full">
+
+      {/* Mobile: padding-0 to use full width, Desktop: normal padding */}
+      <CardContent className="p-0 pb-4 md:p-6">
+        <div className="h-[250px] md:h-[300px] w-full">
           {data.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -59,8 +61,9 @@ export function CategoryPie({ transactions }: CategoryPieProps) {
                   data={data}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
+                  // Mobile pe ring thoda patla aur chhota
+                  innerRadius={50}
+                  outerRadius={70}
                   paddingAngle={5}
                   dataKey="value"
                 >
@@ -71,12 +74,25 @@ export function CategoryPie({ transactions }: CategoryPieProps) {
                     />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => `${symbol}${value}`} />
-                <Legend verticalAlign="bottom" height={36} />
+                <Tooltip
+                  formatter={(value: number) => `${symbol}${value}`}
+                  contentStyle={{
+                    borderRadius: "8px",
+                    border: "none",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  }}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  height={36}
+                  iconType="circle"
+                  // Mobile pe font size adjust
+                  wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
+                />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
               No expense data
             </div>
           )}
