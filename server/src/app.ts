@@ -9,6 +9,7 @@ import accountRoutes from "./routes/accountRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import transactionRoutes from "./routes/transactionRoutes.js";
 import budgetRoutes from "./routes/budgetRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 const app: Application = express();
 
@@ -52,5 +53,6 @@ app.use("/api/accounts", accountRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/budgets", budgetRoutes);
+app.use("/api/payments", paymentRoutes);
 
 export default app;

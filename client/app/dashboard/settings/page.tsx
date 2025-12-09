@@ -1,87 +1,102 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import api from "@/lib/api";
+
+// Forms
 import { ProfileForm } from "@/components/settings/profile-form";
 import { AppearanceForm } from "@/components/settings/appearance-form";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
-import { User, Palette } from "lucide-react";
+// New Import
+import { SubscriptionButton } from "@/components/subscription-button";
 
 export default function SettingsPage() {
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
-
-  const fetchProfile = async () => {
-    try {
-      if (!user) setLoading(true);
-      const res = await api.get("/users/profile");
-      setUser(res.data);
-    } catch (error) {
-      toast.error("Failed to load settings.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchProfile();
+    api
+      .get("/users/profile")
+      .then((res) => setUser(res.data))
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading && !user) {
+  if (loading)
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-[500px] w-full rounded-xl" />
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-[400px] w-full" />
       </div>
     );
-  }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in-50 py-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground text-sm">
+    <div className="space-y-6 max-w-4xl mx-auto pb-10">
+      <div>
+        <h3 className="text-lg font-medium">Settings</h3>
+        <p className="text-sm text-muted-foreground">
           Manage your account settings and preferences.
         </p>
       </div>
+      <Separator />
 
-      <Tabs defaultValue="profile" className="w-full space-y-6">
-        {/* SHADCN STANDARD TABS LOOK */}
-        <div className="flex items-center">
-          <TabsList className="grid w-full sm:w-[400px] grid-cols-2 bg-muted p-1 rounded-lg h-10">
-            <TabsTrigger
-              value="profile"
-              className="rounded-md text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-2 h-full"
-            >
-              <User className="h-4 w-4" /> Profile
-            </TabsTrigger>
-            <TabsTrigger
-              value="appearance"
-              className="rounded-md text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-2 h-full"
-            >
-              <Palette className="h-4 w-4" /> Appearance
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      <Tabs defaultValue="general" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="general">Profile</TabsTrigger>
+          <TabsTrigger value="appearance">Appearance</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger> {/* New Tab */}
+        </TabsList>
 
-        {/* Content Area */}
-        <div className="mt-6">
-          <TabsContent
-            value="profile"
-            className="space-y-4 focus-visible:outline-none"
-          >
-            {user && <ProfileForm user={user} onUpdate={fetchProfile} />}
-          </TabsContent>
+        {/* Profile Tab */}
+        <TabsContent value="general">
+          <ProfileForm user={user} />
+        </TabsContent>
 
-          <TabsContent
-            value="appearance"
-            className="space-y-4 focus-visible:outline-none"
-          >
-            {user && <AppearanceForm user={user} onUpdate={fetchProfile} />}
-          </TabsContent>
-        </div>
+        {/* Appearance Tab */}
+        <TabsContent value="appearance">
+          <AppearanceForm user={user} />
+        </TabsContent>
+
+        {/* Billing Tab (New) */}
+        <TabsContent value="billing">
+          <Card>
+            <CardHeader>
+              <CardTitle>Subscription Plan</CardTitle>
+              <CardDescription>
+                Manage your billing and subscription plan.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-zinc-50 dark:bg-zinc-900/50">
+                <div>
+                  <h4 className="font-semibold text-base">Cashocket Pro</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    First 3 months{" "}
+                    <span className="text-emerald-600 font-bold">FREE</span>,
+                    then ₹49/month.
+                  </p>
+                  <ul className="text-xs text-muted-foreground mt-3 space-y-1 list-disc list-inside">
+                    <li>Unlimited Accounts & Categories</li>
+                    <li>Export to CSV/PDF (Coming Soon)</li>
+                    <li>Priority Support</li>
+                  </ul>
+                </div>
+                <div className="w-full sm:w-auto">
+                  <SubscriptionButton />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );

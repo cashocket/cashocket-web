@@ -23,12 +23,18 @@ export const users = pgTable("users", {
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  razorpaySubscriptionId: text("razorpay_subscription_id"),
-  status: subscriptionStatusEnum("status").default("active"),
+  
+  // Razorpay Specific Fields
+  razorpaySubscriptionId: text("razorpay_subscription_id").unique(),
+  razorpayPlanId: text("razorpay_plan_id"),
+  
+  status: subscriptionStatusEnum("status").default("inactive"), // active, authenticated, etc.
+  
   currentPeriodStart: timestamp("current_period_start"),
   currentPeriodEnd: timestamp("current_period_end"),
-  planName: text("plan_name").default("monthly_basic"),
+  
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // 3. Accounts Table (e.g., Bank, Wallet, Cash)
