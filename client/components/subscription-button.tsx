@@ -35,9 +35,9 @@ export function SubscriptionButton() {
         subscription_id: data.id,
         name: "Cashocket Pro",
         description: "3 Months Free Trial",
-        image: "https://github.com/shadcn.png", // Aap apna logo URL daal sakte hain
+        image: "https://github.com/shadcn.png", // Replace with your logo
 
-        // Success Handler
+        // Success Handler - Ye tabhi chalega jab payment/auth successful hoga
         handler: async function (response: any) {
           try {
             toast.loading("Verifying payment...");
@@ -49,10 +49,10 @@ export function SubscriptionButton() {
               razorpay_signature: response.razorpay_signature,
             });
 
-            toast.dismiss(); // Loading hatao
+            toast.dismiss();
             toast.success("Subscription Active! 🎉 Trial Started.");
 
-            // Page reload taaki naya status reflect ho
+            // Reload to reflect changes
             window.location.reload();
           } catch (err) {
             toast.dismiss();
@@ -62,30 +62,40 @@ export function SubscriptionButton() {
         },
 
         theme: {
-          color: "#10b981", // Emerald Green (App Theme Match)
+          color: "#10b981",
         },
-        prefill: {
-          // Aap chahein toh user ka email/phone auto-fill kar sakte hain agar context mein hai
-          // name: "User Name",
-          // email: "user@example.com"
+        modal: {
+          ondismiss: function () {
+            setLoading(false);
+            toast("Payment cancelled");
+          },
         },
       };
 
       // 4. Open Razorpay
-      // @ts-ignore (Kyunki Razorpay window object pe directly nahi hota TS mein)
+      // @ts-ignore
       const rzp = new window.Razorpay(options);
 
       rzp.on("payment.failed", function (response: any) {
-        toast.error(response.error.description || "Payment Failed");
+        setLoading(false);
+        // Sirf tab error dikhao agar genuine failure hai, user close kare toh nahi
+        if (response.error.code !== "BAD_REQUEST_ERROR") {
+          toast.error(response.error.description || "Payment Failed");
+        }
       });
 
       rzp.open();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Payment Start Error:", error);
-      toast.error("Could not initiate payment.");
-    } finally {
+      // Agar 404 hai toh matlab backend route nahi mila
+      if (error.response && error.response.status === 404) {
+        toast.error("Payment system is offline (404). Please deploy backend.");
+      } else {
+        toast.error("Could not initiate payment.");
+      }
       setLoading(false);
     }
+    // Note: finally{setLoading(false)} yahan se hata diya hai taaki popup khula rahe
   };
 
   return (
