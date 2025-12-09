@@ -34,7 +34,7 @@ export function SubscriptionButton() {
         key: data.key_id, // Backend se aaya hua Key ID
         subscription_id: data.id,
         name: "Cashocket Pro",
-        description: "3 Months Free Trial",
+        description: "Auth Charge (Refundable). 3 Months Free.",
         image: "https://github.com/shadcn.png", // Replace with your logo
 
         // Success Handler - Ye tabhi chalega jab payment/auth successful hoga

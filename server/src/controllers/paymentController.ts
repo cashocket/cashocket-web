@@ -48,26 +48,40 @@ export const verifySubscription = async (req: Request, res: Response): Promise<a
     // @ts-ignore
     const userId = req.user.id;
 
+    // --- FIX: Signature Verification Logic ---
     const body = razorpay_payment_id + "|" + razorpay_subscription_id;
+    
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
       .update(body.toString())
       .digest("hex");
 
+    // Debugging ke liye (Console mein dekhein kya match nahi ho raha)
+    console.log("Expected:", expectedSignature);
+    console.log("Received:", razorpay_signature);
+
     if (expectedSignature !== razorpay_signature) {
       return res.status(400).json({ message: "Invalid Signature" });
     }
 
-    // DB Save
-    await db.insert(subscriptions).values({
-      userId,
-      razorpaySubscriptionId: razorpay_subscription_id,
-      razorpayPlanId: process.env.RAZORPAY_PLAN_ID!,
-      status: "active",
-      currentPeriodStart: new Date(),
-      // Trial end date save kar rahe hain
-      currentPeriodEnd: new Date(new Date().setMonth(new Date().getMonth() + 3)), 
-    });
+    // --- FIX: DB Transaction Check ---
+    // Check agar subscription already exist karta hai toh crash na ho
+    try {
+      await db.insert(subscriptions).values({
+        userId,
+        razorpaySubscriptionId: razorpay_subscription_id,
+        razorpayPlanId: process.env.RAZORPAY_PLAN_ID!,
+        status: "active",
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(new Date().setMonth(new Date().getMonth() + 3)), 
+      });
+    } catch (dbError: any) {
+      // Agar duplicate key error hai, toh ise success maano (User refresh kar raha hoga)
+      if (dbError.code === '23505') {
+         return res.json({ success: true, message: "Subscription already active!" });
+      }
+      throw dbError; // Koi aur error hai toh catch block mein bhejo
+    }
 
     return res.json({ success: true, message: "Subscription verified!" });
 
