@@ -4,18 +4,20 @@ import { db } from "../config/db.js";
 import { users, subscriptions } from "../models/schema.js";
 import { eq } from "drizzle-orm";
 
+// FIX 1: apiVersion hata diya gaya hai to use default sdk version
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-01-27.acacia", // Latest version use karein
+  typescript: true,
 });
 
 // --- 1. CREATE CHECKOUT SESSION (Start Trial) ---
 export const createCheckoutSession = async (req: Request, res: Response): Promise<any> => {
   try {
-    // @ts-ignore
-    const userId = req.user.id;
-    const { email, name } = req.user; // Auth middleware se aayega
+    // FIX 2: 'req.user' ko access karne ke liye casting
+    const userObj = (req as any).user;
+    const userId = userObj.id;
+    const { email, name } = userObj;
 
-    // 1. User details fetch karein taaki Stripe Customer ID check kar sakein
+    // 1. User details fetch karein
     const [user] = await db.select().from(users).where(eq(users.id, userId));
 
     let customerId = user.stripeCustomerId;
@@ -68,7 +70,6 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
   let event: Stripe.Event;
 
   try {
-    // Raw body verification
     event = stripe.webhooks.constructEvent(
       req.body,
       sig!,
@@ -80,27 +81,23 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
   }
 
   try {
-    // Event Types Handle karein
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        // Subscription details fetch karein
         const subscriptionId = session.subscription as string;
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         
-        // Metadata se userId nikalein (ya customer lookup karein)
-        // Subscription object mein metadata nahi hota by default, humne checkout mein dala tha.
-        // Better way: Customer ID se user dhundhein
+        // FIX 3: Casting subscription to 'any' to avoid TS errors on properties
+        const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
+        
         const customerId = session.customer as string;
         const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
 
         if (user) {
-          // DB mein subscription entry
           await db.insert(subscriptions).values({
             userId: user.id,
             stripeSubscriptionId: subscription.id,
             stripePriceId: subscription.items.data[0].price.id,
-            status: "trialing", // Shuru mein trial hoga
+            status: "trialing",
             trialEnd: new Date(subscription.trial_end! * 1000),
             currentPeriodStart: new Date(subscription.current_period_start * 1000),
             currentPeriodEnd: new Date(subscription.current_period_end * 1000),
@@ -118,11 +115,10 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
       }
 
       case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription;
-        // DB Update
+        const subscription: any = event.data.object;
         await db.update(subscriptions)
           .set({
-            status: subscription.status as any, // active, past_due, etc.
+            status: subscription.status,
             currentPeriodStart: new Date(subscription.current_period_start * 1000),
             currentPeriodEnd: new Date(subscription.current_period_end * 1000),
             trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null
