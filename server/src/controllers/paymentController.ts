@@ -4,10 +4,8 @@ import { db } from "../config/db.js";
 import { users, subscriptions } from "../models/schema.js";
 import { eq } from "drizzle-orm";
 
-// FIX 1: Force API Version to enable automatic_payment_methods (UPI)
-// 'as any' use kiya hai taaki TypeScript version mismatch ka error na de
+// Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia" as any, 
   typescript: true,
 });
 
@@ -40,12 +38,12 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
       await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
     }
 
-    // FIX 2: Session Payload
+    // FIX: Removed 'automatic_payment_methods' because it causes errors in Subscription mode.
+    // Stripe will automatically use Payment Methods enabled in your Dashboard.
     const sessionPayload: any = {
       customer: customerId,
       mode: "subscription",
-      // Ab ye parameter 'Unknown' nahi aayega kyunki humne API version fix kar diya hai
-      automatic_payment_methods: { enabled: true }, 
+      payment_method_collection: "always",
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID,
