@@ -23,7 +23,9 @@ export const users = pgTable("users", {
 // 2. Subscriptions Table
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  
+  // FIX: Added .unique() here. Ek user ki sirf ek active subscription ho sakti hai.
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
   
   // Stripe Specific Fields
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
@@ -32,7 +34,7 @@ export const subscriptions = pgTable("subscriptions", {
   status: subscriptionStatusEnum("status").default("inactive"),
   
   // Trial & Period Tracking
-  trialEnd: timestamp("trial_end"), // Trial kab khatam ho raha hai
+  trialEnd: timestamp("trial_end"),
   currentPeriodStart: timestamp("current_period_start"),
   currentPeriodEnd: timestamp("current_period_end"),
   
