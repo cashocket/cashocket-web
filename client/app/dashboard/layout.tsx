@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Loader2 } from "lucide-react";
+import { useUser } from "@/hooks/use-user"; // Import Hook
 
 export default function DashboardLayout({
   children,
@@ -12,23 +13,35 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const { user, subscription, loading } = useUser(); // User data fetch karo
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    // 1. Token check karo
+    // 1. Token Check
     const token = localStorage.getItem("token");
-
     if (!token) {
-      // Agar token nahi hai, Login par bhej do
       router.replace("/login");
-    } else {
-      // Agar token hai, Dashboard dikhao
-      setIsAuthorized(true);
+      return;
     }
-  }, [router]);
 
-  // Loading state taaki protected content flash na ho
-  if (!isAuthorized) {
+    // 2. Subscription Check (Jab data load ho jaye)
+    if (!loading) {
+      // Agar subscription active ya trialing nahi hai
+      if (
+        !subscription ||
+        (subscription.status !== "active" && subscription.status !== "trialing")
+      ) {
+        // User ko Subscribe page par bhej do
+        router.replace("/subscribe");
+      } else {
+        // Sab sahi hai, Dashboard dikhao
+        setIsAuthorized(true);
+      }
+    }
+  }, [loading, subscription, router]);
+
+  // Loading state (Data fetch hone tak spinner dikhao)
+  if (loading || !isAuthorized) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
