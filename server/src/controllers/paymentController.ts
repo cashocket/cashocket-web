@@ -4,8 +4,10 @@ import { db } from "../config/db.js";
 import { users, subscriptions } from "../models/schema.js";
 import { eq } from "drizzle-orm";
 
-// Initialize Stripe
+// FIX 1: Force API Version to enable automatic_payment_methods (UPI)
+// 'as any' use kiya hai taaki TypeScript version mismatch ka error na de
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-12-18.acacia" as any, 
   typescript: true,
 });
 
@@ -26,7 +28,7 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
     let customerId = user.stripeCustomerId;
 
     const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
-    const isReturningUser = !!existingSub;
+    const isReturningUser = !!existingSub; 
 
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -38,22 +40,32 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
       await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
     }
 
-    // FIX: Type error avoid karne ke liye 'as any' use kar rahe hain
+    // FIX 2: Session Payload
     const sessionPayload: any = {
       customer: customerId,
       mode: "subscription",
-      automatic_payment_methods: { enabled: true }, // Cards + UPI
-      payment_method_collection: "always",
-      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+      // Ab ye parameter 'Unknown' nahi aayega kyunki humne API version fix kar diya hai
+      automatic_payment_methods: { enabled: true }, 
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
       success_url: `${process.env.CLIENT_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CLIENT_URL}/subscribe`,
       metadata: { userId: userId },
     };
 
     if (!isReturningUser) {
-       sessionPayload.subscription_data = { trial_period_days: 90, metadata: { userId: userId } };
+       sessionPayload.subscription_data = {
+         trial_period_days: 90,
+         metadata: { userId: userId },
+       };
     } else {
-       sessionPayload.subscription_data = { metadata: { userId: userId } };
+       sessionPayload.subscription_data = {
+         metadata: { userId: userId },
+       };
     }
 
     const session = await stripe.checkout.sessions.create(sessionPayload);
@@ -65,23 +77,19 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
   }
 };
 
-// --- 2. CREATE CUSTOMER PORTAL SESSION ---
+// --- 2. CREATE CUSTOMER PORTAL ---
 export const createCustomerPortal = async (req: Request, res: Response): Promise<any> => {
   try {
     const userObj = (req as any).user;
     const userId = userObj.id;
-
     const [user] = await db.select().from(users).where(eq(users.id, userId));
 
-    if (!user.stripeCustomerId) {
-      return res.status(400).json({ message: "No subscription found" });
-    }
+    if (!user.stripeCustomerId) return res.status(400).json({ message: "No subscription found" });
 
     const session = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
       return_url: `${process.env.CLIENT_URL}/dashboard/settings`,
     });
-
     return res.json({ url: session.url });
   } catch (error) {
     console.error("Portal Error:", error);
@@ -111,7 +119,6 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
         const subscriptionId = session.subscription as string;
         const customerId = session.customer as string;
 
-        // FIX: Cast to 'any' to avoid TS errors
         const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
         const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
 
