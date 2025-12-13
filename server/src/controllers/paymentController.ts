@@ -4,7 +4,7 @@ import { db } from "../config/db.js";
 import { users, subscriptions } from "../models/schema.js";
 import { eq } from "drizzle-orm";
 
-// FIX 1: apiVersion hata diya gaya hai to use default sdk version
+// FIX 1: apiVersion hata diya gaya hai taaki version mismatch error na aaye
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   typescript: true,
 });
@@ -12,7 +12,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 // --- 1. CREATE CHECKOUT SESSION (Start Trial) ---
 export const createCheckoutSession = async (req: Request, res: Response): Promise<any> => {
   try {
-    // FIX 2: 'req.user' ko access karne ke liye casting
+    // FIX 2: req ko cast kiya 'any' mein taaki 'user' access ho sake
     const userObj = (req as any).user;
     const userId = userObj.id;
     const { email, name } = userObj;
@@ -86,7 +86,7 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
         const session = event.data.object as Stripe.Checkout.Session;
         const subscriptionId = session.subscription as string;
         
-        // FIX 3: Casting subscription to 'any' to avoid TS errors on properties
+        // FIX 3: Subscription object ko 'any' cast kiya taaki TS error na de
         const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
         
         const customerId = session.customer as string;
@@ -115,6 +115,7 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
       }
 
       case "customer.subscription.updated": {
+        // FIX 4: Event object ko 'any' cast kiya
         const subscription: any = event.data.object;
         await db.update(subscriptions)
           .set({

@@ -13,7 +13,7 @@ import { CreditCard, User, Palette } from "lucide-react";
 // Components
 import { ProfileForm } from "@/components/settings/profile-form";
 import { AppearanceForm } from "@/components/settings/appearance-form";
-import { BillingForm } from "@/components/settings/billing-form"; // NEW IMPORT
+import { BillingForm } from "@/components/settings/billing-form";
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
@@ -75,21 +75,20 @@ export default function SettingsPage() {
           </TabsList>
         </div>
 
-        {/* --- PROFILE TAB --- */}
+        {/* --- PROFILE TAB (Needs User Prop) --- */}
         <TabsContent value="general" className="animate-in fade-in-50">
-          {/* FIX: onUpdate prop added here */}
           <ProfileForm user={user} onUpdate={fetchProfile} />
         </TabsContent>
 
-        {/* --- APPEARANCE TAB --- */}
+        {/* --- APPEARANCE TAB (Needs User Prop) --- */}
         <TabsContent value="appearance" className="animate-in fade-in-50">
-          {/* FIX: onUpdate prop added here */}
           <AppearanceForm user={user} onUpdate={fetchProfile} />
         </TabsContent>
 
-        {/* --- BILLING TAB --- */}
+        {/* --- BILLING TAB (Self-contained, NO Prop needed) --- */}
         <TabsContent value="billing" className="animate-in fade-in-50">
-          <BillingForm user={user} />
+          {/* FIX: Removed 'user={user}' because BillingForm uses useUser hook now */}
+          <BillingForm />
         </TabsContent>
       </Tabs>
     </div>
