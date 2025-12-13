@@ -18,14 +18,18 @@ const toDate = (timestamp: any): Date | null => {
 // --- 1. CREATE CHECKOUT SESSION (Start Trial) ---
 export const createCheckoutSession = async (req: Request, res: Response): Promise<any> => {
   try {
-    // Cast req to any to access user
     const userObj = (req as any).user;
     const userId = userObj.id;
     const { email, name } = userObj;
 
-    // 1. Fetch user to check for existing Stripe Customer ID
+    // 1. Fetch user info
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     let customerId = user.stripeCustomerId;
+
+    // Check if user is returning (Pehle kabhi subscription li thi?)
+    // Hum check karenge ki kya DB mein stripeSubscriptionId exist karta hai (bhale hi canceled ho)
+    const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
+    const isReturningUser = !!existingSub; 
 
     // 2. Create Stripe Customer if not exists
     if (!customerId) {
@@ -41,8 +45,8 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
         .where(eq(users.id, userId));
     }
 
-    // 3. Create Checkout Session
-    const session = await stripe.checkout.sessions.create({
+    // 3. Prepare Checkout Session Payload
+    const sessionPayload: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       mode: "subscription",
       payment_method_collection: "always",
@@ -52,15 +56,29 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
           quantity: 1,
         },
       ],
-      subscription_data: {
-        trial_period_days: 90,
-        metadata: { userId: userId },
-      },
+      // Redirect URLs
       success_url: `${process.env.CLIENT_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.CLIENT_URL}/dashboard/settings`,
-    });
+      cancel_url: `${process.env.CLIENT_URL}/subscribe`, // Cancel karne par wapas subscribe page par bhejo
+      metadata: { userId: userId },
+    };
+
+    // 4. Trial Logic: Sirf New Users ko Trial milega
+    if (!isReturningUser) {
+       sessionPayload.subscription_data = {
+         trial_period_days: 90,
+         metadata: { userId: userId },
+       };
+    } else {
+       // Returning user: Immediate Charge (No Trial)
+       sessionPayload.subscription_data = {
+         metadata: { userId: userId },
+       };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionPayload);
 
     return res.json({ url: session.url });
+
   } catch (error) {
     console.error("Stripe Session Error:", error);
     return res.status(500).json({ message: "Failed to create checkout session" });
