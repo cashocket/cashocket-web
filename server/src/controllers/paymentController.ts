@@ -4,11 +4,12 @@ import { db } from "../config/db.js";
 import { users, subscriptions } from "../models/schema.js";
 import { eq } from "drizzle-orm";
 
+// Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   typescript: true,
 });
 
-// Helper function
+// Helper function to safely convert Stripe timestamps
 const toDate = (timestamp: any): Date | null => {
   if (!timestamp) return null;
   return new Date(timestamp * 1000);
@@ -24,10 +25,11 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     let customerId = user.stripeCustomerId;
 
-    // Check Returning User
+    // Check if user is returning
     const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
-    const isReturningUser = !!existingSub;
+    const isReturningUser = !!existingSub; 
 
+    // Create Customer if needed
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: email,
@@ -38,20 +40,38 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
       await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
     }
 
+    // Checkout Session Payload
     const sessionPayload: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       mode: "subscription",
+      
+      // ✅ NEW: Enable Automatic Payment Methods (Cards, UPI, Netbanking etc.)
+      automatic_payment_methods: { enabled: true },
+      
+      // Collecting payment method details for future use
       payment_method_collection: "always",
-      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+      
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
       success_url: `${process.env.CLIENT_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CLIENT_URL}/subscribe`,
       metadata: { userId: userId },
     };
 
+    // Trial Logic
     if (!isReturningUser) {
-       sessionPayload.subscription_data = { trial_period_days: 90, metadata: { userId: userId } };
+       sessionPayload.subscription_data = {
+         trial_period_days: 90,
+         metadata: { userId: userId },
+       };
     } else {
-       sessionPayload.subscription_data = { metadata: { userId: userId } };
+       sessionPayload.subscription_data = {
+         metadata: { userId: userId },
+       };
     }
 
     const session = await stripe.checkout.sessions.create(sessionPayload);
@@ -63,7 +83,7 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
   }
 };
 
-// --- 2. CREATE CUSTOMER PORTAL SESSION (NEW) ---
+// --- 2. CREATE CUSTOMER PORTAL SESSION ---
 export const createCustomerPortal = async (req: Request, res: Response): Promise<any> => {
   try {
     const userObj = (req as any).user;
@@ -87,7 +107,7 @@ export const createCustomerPortal = async (req: Request, res: Response): Promise
   }
 };
 
-// --- 3. WEBHOOK HANDLER (UPDATED) ---
+// --- 3. WEBHOOK HANDLER ---
 export const handleStripeWebhook = async (req: Request, res: Response): Promise<any> => {
   const sig = req.headers["stripe-signature"];
   let event: Stripe.Event;
@@ -99,6 +119,7 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
+    console.error(`Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -118,7 +139,7 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
             stripeSubscriptionId: subscription.id,
             stripePriceId: subscription.items.data[0].price.id,
             status: subscription.status,
-            cancelAtPeriodEnd: subscription.cancel_at_period_end, // Save Cancel Status
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
             trialEnd: toDate(subscription.trial_end),
             currentPeriodStart: toDate(subscription.current_period_start),
             currentPeriodEnd: toDate(subscription.current_period_end),
@@ -127,7 +148,7 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
             set: {
               stripeSubscriptionId: subscription.id,
               status: subscription.status,
-              cancelAtPeriodEnd: subscription.cancel_at_period_end, // Save Cancel Status
+              cancelAtPeriodEnd: subscription.cancel_at_period_end,
               trialEnd: toDate(subscription.trial_end),
               currentPeriodEnd: toDate(subscription.current_period_end),
             }
@@ -141,7 +162,7 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
         await db.update(subscriptions)
           .set({
             status: subscription.status,
-            cancelAtPeriodEnd: subscription.cancel_at_period_end, // Save Cancel Status
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
             currentPeriodStart: toDate(subscription.current_period_start),
             currentPeriodEnd: toDate(subscription.current_period_end),
             trialEnd: toDate(subscription.trial_end)
@@ -158,6 +179,7 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
         break;
       }
     }
+
     res.json({ received: true });
   } catch (error) {
     console.error("Webhook Logic Error:", error);
