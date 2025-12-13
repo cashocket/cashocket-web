@@ -1,10 +1,10 @@
 import express from "express";
-import { createSubscription, verifySubscription } from "../controllers/paymentController.js";
+import { createCheckoutSession } from "../controllers/paymentController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/create-subscription", protect, createSubscription);
-router.post("/verify-subscription", protect, verifySubscription);
+// POST /api/payments/create-checkout-session
+router.post("/create-checkout-session", protect, createCheckoutSession);
 
 export default router;

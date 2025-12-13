@@ -10,13 +10,69 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Check, Zap, ShieldCheck, LayoutDashboard } from "lucide-react";
+import { Check, Zap, ShieldCheck, LayoutDashboard, Clock } from "lucide-react";
 import { SubscriptionButton } from "@/components/subscription-button";
+import { Button } from "@/components/ui/button";
 
 export function BillingForm({ user }: { user: any }) {
-  // Agar user already pro hai (future scope), toh UI change kar sakte hain
-  const isPro = user?.isPro || false;
+  // Check subscription status from user object (Backend se aayega)
+  const isPro =
+    user?.subscription?.status === "active" ||
+    user?.subscription?.status === "trialing";
+  const trialEndsAt = user?.subscription?.trialEnd
+    ? new Date(user.subscription.trialEnd)
+    : null;
 
+  // Calculate remaining days
+  const daysLeft = trialEndsAt
+    ? Math.ceil(
+        (trialEndsAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+      )
+    : 0;
+
+  if (isPro) {
+    return (
+      <Card className="border-emerald-500/50 bg-emerald-50/10 dark:bg-emerald-900/10">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className="border-emerald-500 text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30"
+            >
+              PRO ACTIVE
+            </Badge>
+            {user?.subscription?.status === "trialing" && (
+              <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Trial ends in {daysLeft} days
+              </span>
+            )}
+          </div>
+          <CardTitle className="text-2xl mt-2">
+            You are on the Pro Plan
+          </CardTitle>
+          <CardDescription>
+            Enjoy unlimited accounts, advanced analytics, and priority support.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            onClick={() =>
+              window.open(
+                "https://billing.stripe.com/p/login/YOUR_PORTAL_LINK",
+                "_blank"
+              )
+            }
+          >
+            Manage Subscription
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // --- FREE USER UI (Upgrade Offer) ---
   return (
     <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-3">
       {/* Left Side: Current Plan Info (Free) */}
@@ -122,7 +178,7 @@ export function BillingForm({ user }: { user: any }) {
         <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-muted/20">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            <span>Secure payment via Razorpay. Cancel anytime.</span>
+            <span>Secure payment via Stripe. Cancel anytime.</span>
           </div>
           <div className="w-full sm:w-auto">
             <SubscriptionButton />

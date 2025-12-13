@@ -1,35 +1,38 @@
 import { pgTable, uuid, text, timestamp, boolean, decimal, integer, pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
-// Enums (Fixed values)
+// Enums
 export const transactionTypeEnum = pgEnum("transaction_type", ["income", "expense", "transfer"]);
-export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "inactive", "past_due", "canceled"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["trialing", "active", "past_due", "canceled", "incomplete", "inactive"]);
 
 // 1. Users Table
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  password: text("password"), // Google auth walo ka null ho sakta hai
+  password: text("password"),
   avatar: text("avatar"),
   googleId: text("google_id"),
   currency: text("currency").default("INR"),
   theme: text("theme").default("system"),
+  stripeCustomerId: text("stripe_customer_id"), 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// 2. Subscriptions Table (SaaS Logic)
+// 2. Subscriptions Table
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   
-  // Razorpay Specific Fields
-  razorpaySubscriptionId: text("razorpay_subscription_id").unique(),
-  razorpayPlanId: text("razorpay_plan_id"),
+  // Stripe Specific Fields
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  stripePriceId: text("stripe_price_id"),
   
-  status: subscriptionStatusEnum("status").default("inactive"), // active, authenticated, etc.
+  status: subscriptionStatusEnum("status").default("inactive"),
   
+  // Trial & Period Tracking
+  trialEnd: timestamp("trial_end"), // Trial kab khatam ho raha hai
   currentPeriodStart: timestamp("current_period_start"),
   currentPeriodEnd: timestamp("current_period_end"),
   

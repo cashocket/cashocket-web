@@ -10,6 +10,7 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import transactionRoutes from "./routes/transactionRoutes.js";
 import budgetRoutes from "./routes/budgetRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import { handleStripeWebhook } from "./controllers/paymentController.js";
 
 const app: Application = express();
 
@@ -26,19 +27,22 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Agar request bina origin ke hai (e.g. Postman/Mobile App) ya allowed list mein hai
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true, // Cookies/Headers allow karne ke liye zaroori hai
+  credentials: true,
 }));
 
 app.use(morgan("dev"));
 
-// --- Body Parsers (10MB limit for Images) ---
+// --- STRIPE WEBHOOK (Must be before express.json) ---
+// Is route ke liye raw body use karenge taaki signature verify ho sake
+app.post("/api/payments/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
+
+// --- Body Parsers (For rest of the app) ---
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
