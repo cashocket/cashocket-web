@@ -4,34 +4,30 @@ import { db } from "../config/db.js";
 import { users, subscriptions } from "../models/schema.js";
 import { eq } from "drizzle-orm";
 
-// FIX 1: Initialize Stripe with TypeScript support
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   typescript: true,
 });
 
-// Helper function to safely convert Stripe timestamps (seconds) to JS Date (milliseconds)
+// Helper function
 const toDate = (timestamp: any): Date | null => {
   if (!timestamp) return null;
   return new Date(timestamp * 1000);
 };
 
-// --- 1. CREATE CHECKOUT SESSION (Start Trial) ---
+// --- 1. CREATE CHECKOUT SESSION ---
 export const createCheckoutSession = async (req: Request, res: Response): Promise<any> => {
   try {
     const userObj = (req as any).user;
     const userId = userObj.id;
     const { email, name } = userObj;
 
-    // 1. Fetch user info
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     let customerId = user.stripeCustomerId;
 
-    // Check if user is returning (Pehle kabhi subscription li thi?)
-    // Hum check karenge ki kya DB mein stripeSubscriptionId exist karta hai (bhale hi canceled ho)
+    // Check Returning User
     const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
-    const isReturningUser = !!existingSub; 
+    const isReturningUser = !!existingSub;
 
-    // 2. Create Stripe Customer if not exists
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: email,
@@ -39,44 +35,26 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
         metadata: { userId: userId },
       });
       customerId = customer.id;
-
-      await db.update(users)
-        .set({ stripeCustomerId: customerId })
-        .where(eq(users.id, userId));
+      await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
     }
 
-    // 3. Prepare Checkout Session Payload
     const sessionPayload: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       mode: "subscription",
       payment_method_collection: "always",
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-      // Redirect URLs
+      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
       success_url: `${process.env.CLIENT_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.CLIENT_URL}/subscribe`, // Cancel karne par wapas subscribe page par bhejo
+      cancel_url: `${process.env.CLIENT_URL}/subscribe`,
       metadata: { userId: userId },
     };
 
-    // 4. Trial Logic: Sirf New Users ko Trial milega
     if (!isReturningUser) {
-       sessionPayload.subscription_data = {
-         trial_period_days: 90,
-         metadata: { userId: userId },
-       };
+       sessionPayload.subscription_data = { trial_period_days: 90, metadata: { userId: userId } };
     } else {
-       // Returning user: Immediate Charge (No Trial)
-       sessionPayload.subscription_data = {
-         metadata: { userId: userId },
-       };
+       sessionPayload.subscription_data = { metadata: { userId: userId } };
     }
 
     const session = await stripe.checkout.sessions.create(sessionPayload);
-
     return res.json({ url: session.url });
 
   } catch (error) {
@@ -85,7 +63,31 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
   }
 };
 
-// --- 2. WEBHOOK HANDLER ---
+// --- 2. CREATE CUSTOMER PORTAL SESSION (NEW) ---
+export const createCustomerPortal = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const userObj = (req as any).user;
+    const userId = userObj.id;
+
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+
+    if (!user.stripeCustomerId) {
+      return res.status(400).json({ message: "No subscription found" });
+    }
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: `${process.env.CLIENT_URL}/dashboard/settings`,
+    });
+
+    return res.json({ url: session.url });
+  } catch (error) {
+    console.error("Portal Error:", error);
+    return res.status(500).json({ message: "Failed to create portal session" });
+  }
+};
+
+// --- 3. WEBHOOK HANDLER (UPDATED) ---
 export const handleStripeWebhook = async (req: Request, res: Response): Promise<any> => {
   const sig = req.headers["stripe-signature"];
   let event: Stripe.Event;
@@ -97,31 +99,26 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
-    console.error(`Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   try {
-    // Handle specific event types
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const subscriptionId = session.subscription as string;
         const customerId = session.customer as string;
 
-        // Retrieve full subscription details from Stripe
         const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
-
-        // Find user by Stripe Customer ID
         const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
 
         if (user) {
-          // FIX 2: Use safe 'toDate' helper to prevent "Invalid time value" crash
           await db.insert(subscriptions).values({
             userId: user.id,
             stripeSubscriptionId: subscription.id,
             stripePriceId: subscription.items.data[0].price.id,
-            status: subscription.status === 'trialing' ? 'trialing' : 'active',
+            status: subscription.status,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end, // Save Cancel Status
             trialEnd: toDate(subscription.trial_end),
             currentPeriodStart: toDate(subscription.current_period_start),
             currentPeriodEnd: toDate(subscription.current_period_end),
@@ -129,46 +126,38 @@ export const handleStripeWebhook = async (req: Request, res: Response): Promise<
             target: subscriptions.userId,
             set: {
               stripeSubscriptionId: subscription.id,
-              status: subscription.status === 'trialing' ? 'trialing' : 'active',
+              status: subscription.status,
+              cancelAtPeriodEnd: subscription.cancel_at_period_end, // Save Cancel Status
               trialEnd: toDate(subscription.trial_end),
               currentPeriodEnd: toDate(subscription.current_period_end),
             }
           });
-          console.log(`✅ Subscription activated for user: ${user.email}`);
-        } else {
-            console.error("❌ User not found for customer ID:", customerId);
         }
         break;
       }
 
       case "customer.subscription.updated": {
         const subscription: any = event.data.object;
-        
         await db.update(subscriptions)
           .set({
             status: subscription.status,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end, // Save Cancel Status
             currentPeriodStart: toDate(subscription.current_period_start),
             currentPeriodEnd: toDate(subscription.current_period_end),
             trialEnd: toDate(subscription.trial_end)
           })
           .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
-          
-        console.log(`🔄 Subscription updated: ${subscription.id}`);
         break;
       }
 
       case "customer.subscription.deleted": {
         const subscription: any = event.data.object;
-        
         await db.update(subscriptions)
-          .set({ status: "canceled" })
+          .set({ status: "canceled", cancelAtPeriodEnd: false })
           .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
-          
-        console.log(`❌ Subscription canceled: ${subscription.id}`);
         break;
       }
     }
-
     res.json({ received: true });
   } catch (error) {
     console.error("Webhook Logic Error:", error);

@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useUser } from "@/hooks/use-user";
+import api from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -20,13 +22,31 @@ import {
   LayoutDashboard,
   CalendarClock,
   CreditCard,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import { SubscriptionButton } from "@/components/subscription-button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils"; // <--- YE LINE MISSING THI
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function BillingForm() {
   const { user, subscription, loading } = useUser();
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const handlePortal = async () => {
+    setPortalLoading(true);
+    try {
+      const { data } = await api.post("/payments/create-portal-session");
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      toast.error("Failed to open billing portal");
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   if (loading) {
     return <Skeleton className="h-[400px] w-full rounded-xl" />;
@@ -35,12 +55,15 @@ export function BillingForm() {
   // --- PRO / TRIAL USER UI ---
   if (subscription) {
     const isTrial = subscription.status === "trialing";
+    const isCanceled = subscription.isCanceled;
 
     return (
       <Card
         className={cn(
-          "border overflow-hidden",
-          isTrial
+          "border overflow-hidden transition-all",
+          isCanceled
+            ? "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"
+            : isTrial
             ? "border-amber-500/30 bg-amber-50/10 dark:bg-amber-950/10"
             : "border-emerald-500/30 bg-emerald-50/10 dark:bg-emerald-950/10"
         )}
@@ -51,12 +74,16 @@ export function BillingForm() {
               <div
                 className={cn(
                   "p-2 rounded-full",
-                  isTrial
+                  isCanceled
+                    ? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                    : isTrial
                     ? "bg-amber-100 text-amber-600"
                     : "bg-emerald-100 text-emerald-600"
                 )}
               >
-                {isTrial ? (
+                {isCanceled ? (
+                  <LogOut className="h-6 w-6" />
+                ) : isTrial ? (
                   <CalendarClock className="h-6 w-6" />
                 ) : (
                   <Zap className="h-6 w-6" />
@@ -64,10 +91,16 @@ export function BillingForm() {
               </div>
               <div>
                 <CardTitle className="text-xl">
-                  {isTrial ? "Free Trial Active" : "Pro Plan Active"}
+                  {isCanceled
+                    ? "Subscription Canceled"
+                    : isTrial
+                    ? "Free Trial Active"
+                    : "Pro Plan Active"}
                 </CardTitle>
                 <CardDescription>
-                  {isTrial
+                  {isCanceled
+                    ? "Your access is valid until the billing cycle ends."
+                    : isTrial
                     ? "You are enjoying the full Cashocket Pro experience."
                     : "Thanks for being a pro member!"}
                 </CardDescription>
@@ -77,24 +110,33 @@ export function BillingForm() {
               variant="outline"
               className={cn(
                 "px-3 py-1 text-xs font-bold uppercase tracking-wider",
-                isTrial
+                isCanceled
+                  ? "border-zinc-400 text-zinc-500 bg-zinc-100"
+                  : isTrial
                   ? "border-amber-500 text-amber-600 bg-amber-100 dark:bg-amber-900/30"
                   : "border-emerald-500 text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30"
               )}
             >
-              {isTrial ? "Trialing" : "Active"}
+              {isCanceled ? "Expiring Soon" : isTrial ? "Trialing" : "Active"}
             </Badge>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Progress Section */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm font-medium">
               <span className="text-muted-foreground">
-                {isTrial ? "Trial Progress" : "Billing Cycle"}
+                {isCanceled ? "Access Remaining" : "Billing Cycle"}
               </span>
-              <span className={isTrial ? "text-amber-600" : "text-emerald-600"}>
+              <span
+                className={
+                  isCanceled
+                    ? "text-zinc-600"
+                    : isTrial
+                    ? "text-amber-600"
+                    : "text-emerald-600"
+                }
+              >
                 {subscription.daysLeft} days remaining
               </span>
             </div>
@@ -102,20 +144,21 @@ export function BillingForm() {
               value={subscription.progress}
               className={cn(
                 "h-3",
-                isTrial
+                isCanceled
+                  ? "bg-zinc-200 dark:bg-zinc-800"
+                  : isTrial
                   ? "bg-amber-100 dark:bg-amber-900/20"
                   : "bg-emerald-100 dark:bg-emerald-900/20"
               )}
             />
             <p className="text-xs text-muted-foreground text-right">
-              {isTrial ? "Ends on" : "Renews on"}{" "}
+              {isCanceled ? "Expires on" : "Renews on"}{" "}
               {new Date(subscription.endDate!).toLocaleDateString()}
             </p>
           </div>
 
           <Separator />
 
-          {/* Features Enabled */}
           <div className="grid sm:grid-cols-2 gap-4 pt-2">
             <FeatureItem text="Unlimited Accounts" active />
             <FeatureItem text="AI Insights" active />
@@ -131,14 +174,14 @@ export function BillingForm() {
           </div>
           <Button
             variant="outline"
-            onClick={() =>
-              window.open(
-                process.env.NEXT_PUBLIC_STRIPE_CUSTOMER_PORTAL || "#",
-                "_blank"
-              )
-            }
+            onClick={handlePortal}
+            disabled={portalLoading}
           >
-            Manage Subscription
+            {portalLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Manage Subscription"
+            )}
           </Button>
         </CardFooter>
       </Card>
@@ -148,7 +191,6 @@ export function BillingForm() {
   // --- FREE USER UI ---
   return (
     <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-3">
-      {/* Left: Free Plan Card */}
       <Card className="lg:col-span-1 border-border/60 shadow-sm h-fit">
         <CardHeader>
           <CardTitle className="text-lg">Current Plan</CardTitle>
@@ -183,7 +225,6 @@ export function BillingForm() {
         </CardContent>
       </Card>
 
-      {/* Right: Upgrade Card */}
       <Card className="lg:col-span-2 relative border-emerald-500/30 dark:border-emerald-500/50 shadow-xl shadow-emerald-500/5 overflow-hidden">
         <div className="absolute top-0 right-0">
           <div className="bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase tracking-wider">

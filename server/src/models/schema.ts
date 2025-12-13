@@ -32,6 +32,7 @@ export const subscriptions = pgTable("subscriptions", {
   stripePriceId: text("stripe_price_id"),
   
   status: subscriptionStatusEnum("status").default("inactive"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
   
   // Trial & Period Tracking
   trialEnd: timestamp("trial_end"),
